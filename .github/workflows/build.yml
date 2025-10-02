@@ -53,31 +53,27 @@ jobs:
 
     - name: Verify frontend build
       run: |
-        if [ ! -f "dist/index.html" ]; then
-          echo "ERROR: Frontend build failed - dist/index.html not found"
-          exit 1
-        fi
+        test -f "dist/index.html" || (echo "ERROR: Frontend build failed - dist/index.html not found" && exit 1)
         echo "Frontend build verified successfully"
 
     - name: Build executable with PyInstaller
       run: |
         python build_exe.py
 
-    - name: Verify executable build
+    - name: Verify executable build (Windows)
+      if: matrix.os == 'windows-latest'
       run: |
-        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-          if [ ! -f "dist/app.exe" ]; then
-            echo "ERROR: Windows executable not found"
-            exit 1
-          fi
-          echo "Windows executable verified: dist/app.exe"
-        else
-          if [ ! -f "dist/app" ]; then
-            echo "ERROR: Unix executable not found"
-            exit 1
-          fi
-          echo "Unix executable verified: dist/app"
-        fi
+        if (!(Test-Path "dist/app.exe")) {
+          Write-Error "ERROR: Windows executable not found"
+          exit 1
+        }
+        Write-Host "Windows executable verified: dist/app.exe"
+
+    - name: Verify executable build (Unix)
+      if: matrix.os != 'windows-latest'
+      run: |
+        test -f "dist/app" || (echo "ERROR: Unix executable not found" && exit 1)
+        echo "Unix executable verified: dist/app"
 
     - name: Upload executable as artifact
       uses: actions/upload-artifact@v4
