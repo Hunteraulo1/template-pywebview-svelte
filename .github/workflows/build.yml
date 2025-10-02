@@ -67,24 +67,33 @@ jobs:
     - name: Verify executable build (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        if (!(Test-Path "dist/app.exe")) {
+        $exe = Get-ChildItem "dist/app-windows-v*.exe" | Select-Object -First 1
+        if (!$exe) {
           Write-Error "ERROR: Windows executable not found"
           exit 1
         }
-        Write-Host "Windows executable verified: dist/app.exe"
+        Write-Host "Windows executable verified: $($exe.Name)"
 
     - name: Verify executable build (Unix)
       if: matrix.os != 'windows-latest'
       run: |
-        test -f "dist/app" || (echo "ERROR: Unix executable not found" && exit 1)
-        echo "Unix executable verified: dist/app"
+        exe=$(find dist -name "app-*-v*" -not -name "*.exe" | head -1)
+        if [ -z "$exe" ]; then
+          echo "ERROR: Unix executable not found"
+          exit 1
+        fi
+        echo "Unix executable verified: $(basename $exe)"
+
+    - name: Get version from package.json
+      id: version
+      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
     - name: Upload executable as artifact
       uses: actions/upload-artifact@v4
       with:
-        name: executable-${{ matrix.os }}-python${{ matrix.python-version }}
+        name: app-${{ matrix.os }}-v${{ steps.version.outputs.version }}
         path: |
-          dist/app*
+          dist/app-*-v*
         retention-days: 30
 
     - name: Upload build logs
@@ -103,6 +112,9 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/preview')
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
@@ -141,13 +153,17 @@ jobs:
         - The executable is standalone and portable
         EOF
 
+    - name: Get version from package.json
+      id: version
+      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
         files: |
           release/**/*
-        tag_name: v${{ github.run_number }}
-        name: Release v${{ github.run_number }}
+        tag_name: v${{ steps.version.outputs.version }}
+        name: Release v${{ steps.version.outputs.version }}
         body: |
           ## 🚀 New version available !
           
@@ -155,8 +171,8 @@ jobs:
           
           ### 📦 Downloads
           
-          - **Windows** : `app.exe`
-          - **Linux** : `app`
+          - **Windows** : `app-windows-v${{ steps.version.outputs.version }}.exe`
+          - **Linux** : `app-linux-v${{ steps.version.outputs.version }}`
           
           ### 🔧 Technical details
           

@@ -82,21 +82,67 @@ def build_executable():
             return False
 
         print("OK: Executable built successfully")
+        
+        # Rename executable with version and OS
+        rename_executable()
+        
         return True
 
     except (subprocess.SubprocessError, OSError) as e:
         print(f"ERROR: Exception during build: {e}")
         return False
 
+def rename_executable():
+    """Rename executable with version and OS"""
+    import json
+    import platform
+    
+    # Get version from package.json
+    try:
+        with open('package.json', 'r') as f:
+            data = json.load(f)
+            version = data.get('version', '1.0.0')
+    except:
+        version = '1.0.0'
+    
+    # Get OS name
+    system = platform.system().lower()
+    if system == 'windows':
+        os_name = 'windows'
+        old_name = 'app-temp.exe'
+        new_name = f'app-{os_name}-v{version}.exe'
+    elif system == 'linux':
+        os_name = 'linux'
+        old_name = 'app-temp'
+        new_name = f'app-{os_name}-v{version}'
+    elif system == 'darwin':
+        os_name = 'macos'
+        old_name = 'app-temp'
+        new_name = f'app-{os_name}-v{version}'
+    else:
+        os_name = 'unknown'
+        old_name = 'app-temp'
+        new_name = f'app-{os_name}-v{version}'
+    
+    old_path = Path(f"dist/{old_name}")
+    new_path = Path(f"dist/{new_name}")
+    
+    if old_path.exists():
+        old_path.rename(new_path)
+        print(f"OK: Renamed executable to {new_name}")
+    else:
+        print(f"WARNING: Executable {old_name} not found for renaming")
+
 def verify_build():
     """Verify that executable was created correctly"""
     print("Verifying build...")
 
-    # Look for executable (with or without extension depending on OS)
-    exe_paths = [
-        Path("dist/app.exe"),  # Windows
-        Path("dist/app"),      # Linux/Mac
-    ]
+    # Look for renamed executables with version and OS
+    exe_paths = []
+    for file in Path("dist").glob("app-*-v*"):
+        exe_paths.append(file)
+    for file in Path("dist").glob("app-*-v*.exe"):
+        exe_paths.append(file)
 
     exe_path = None
     for path in exe_paths:
