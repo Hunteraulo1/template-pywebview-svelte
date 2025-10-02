@@ -1,0 +1,177 @@
+name: Build Application
+
+on:
+  push:
+    branches: [ main, preview ]
+  pull_request:
+    branches: [ main, preview ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.13']
+        exclude:
+          - os: macos-latest
+            python-version: '3.13'
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: '24'
+
+    - name: Install pnpm
+      run: |
+        npm install -g pnpm
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install -r requirements.txt
+
+    - name: Install Node.js dependencies
+      run: |
+        pnpm install
+
+    - name: Build frontend (Svelte)
+      run: |
+        pnpm run build
+
+    - name: Verify frontend build
+      run: |
+        if [ ! -f "dist/index.html" ]; then
+          echo "ERROR: Frontend build failed - dist/index.html not found"
+          exit 1
+        fi
+        echo "Frontend build verified successfully"
+
+    - name: Build executable with PyInstaller
+      run: |
+        python build_exe.py
+
+    - name: Verify executable build
+      run: |
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          if [ ! -f "dist/app.exe" ]; then
+            echo "ERROR: Windows executable not found"
+            exit 1
+          fi
+          echo "Windows executable verified: dist/app.exe"
+        else
+          if [ ! -f "dist/app" ]; then
+            echo "ERROR: Unix executable not found"
+            exit 1
+          fi
+          echo "Unix executable verified: dist/app"
+        fi
+
+    - name: Upload executable as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: executable-${{ matrix.os }}-python${{ matrix.python-version }}
+        path: |
+          dist/app*
+        retention-days: 30
+
+    - name: Upload build logs
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: build-logs-${{ matrix.os }}-python${{ matrix.python-version }}
+        path: |
+          build/
+        retention-days: 7
+
+  # Job to create an automatic release
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Create release archive
+      run: |
+        mkdir -p release
+        # Organize artifacts by OS
+        for artifact_dir in artifacts/*/; do
+          os_name=$(basename "$artifact_dir")
+          mkdir -p "release/$os_name"
+          cp "$artifact_dir"/* "release/$os_name/" 2>/dev/null || true
+        done
+        
+        # Create a README for the release
+        cat > release/README.md << 'EOF'
+        # PyWebView + Svelte Application
+        
+        ## Download
+        
+        Choose the executable corresponding to your operating system:
+        
+        - **Windows** : `app.exe`
+        - **Linux** : `app` (make executable with `chmod +x`)
+        - **macOS** : `app` (make executable with `chmod +x`)
+        
+        ## Usage
+        
+        Double-click the executable or run it from the terminal.
+        
+        ## Notes
+        
+        - The application includes all necessary dependencies
+        - No additional installation is required
+        - The executable is standalone and portable
+        EOF
+
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/**/*
+        tag_name: v${{ github.run_number }}
+        name: Release v${{ github.run_number }}
+        body: |
+          ## 🚀 New version available !
+          
+          This release contains executables for all supported operating systems.
+          
+          ### 📦 Downloads
+          
+          - **Windows** : `app.exe`
+          - **Linux** : `app`
+          - **macOS** : `app`
+          
+          ### 🔧 Technical details
+          
+          - Automatic build from `main` branch
+          - Python 3.8+
+          - Compiled Svelte frontend
+          - Standalone PyInstaller executable
+          
+          ### 📋 Instructions
+          
+          1. Download the executable corresponding to your OS
+          2. Launch the application (double-click or terminal)
+          3. No additional installation required !
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

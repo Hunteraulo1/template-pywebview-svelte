@@ -75,14 +75,14 @@ def build_executable():
             encoding='utf-8', errors='replace', check=False
         )
 
-        if result.returncode == 0:
-            print("OK: Executable built successfully")
-            return True
-        else:
+        if result.returncode != 0:
             print("ERROR: Build failed")
             print(f"Output: {result.stdout}")
             print(f"Errors: {result.stderr}")
             return False
+
+        print("OK: Executable built successfully")
+        return True
 
     except (subprocess.SubprocessError, OSError) as e:
         print(f"ERROR: Exception during build: {e}")
@@ -104,17 +104,17 @@ def verify_build():
             exe_path = path
             break
 
-    if exe_path:
-        size_mb = exe_path.stat().st_size / (1024 * 1024)
-        print(f"OK: Executable created: {exe_path}")
-        print(f"Size: {size_mb:.1f} MB")
-        return True
-    else:
+    if not exe_path:
         print("ERROR: Executable not found")
         print("Searching in:")
         for path in exe_paths:
             print(f"  - {path}")
         return False
+
+    size_mb = exe_path.stat().st_size / (1024 * 1024)
+    print(f"OK: Executable created: {exe_path}")
+    print(f"Size: {size_mb:.1f} MB")
+    return True
 
 def clean_external_files():
     """Clean external files after onefile build"""

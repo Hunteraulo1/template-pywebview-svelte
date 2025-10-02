@@ -1,6 +1,5 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
-import path from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
@@ -8,10 +7,8 @@ export default defineConfig({
   root: '.',
   publicDir: 'public',
   resolve: {
-    alias: {
-      $lib: path.resolve('./src/lib'),
-      $components: path.resolve('./src/components'),
-    },
+    extensions: ['.js', '.ts', '.svelte', '.json'],
+    mainFields: ['browser', 'module', 'jsnext:main', 'jsnext'],
   },
   build: {
     outDir: 'dist',

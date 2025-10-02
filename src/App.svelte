@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Header from '$components/Header.svelte';
-  import { apiService } from '$lib/api';
   import { onMount } from 'svelte';
+  import Header from './components/Header.svelte';
+  import { apiService } from './lib/api.ts';
 
   let isLoading = true;
   let error: string | null = null;
