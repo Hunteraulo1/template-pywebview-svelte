@@ -96,7 +96,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/preview')
     
     steps:
     - name: Download all artifacts
@@ -138,7 +138,7 @@ jobs:
         EOF
 
     - name: Create release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           release/**/*
@@ -153,11 +153,10 @@ jobs:
           
           - **Windows** : `app.exe`
           - **Linux** : `app`
-          - **macOS** : `app`
           
           ### 🔧 Technical details
           
-          - Automatic build from `main` branch
+          - Automatic build from `${{ github.ref_name }}` branch
           - Python 3.8+
           - Compiled Svelte frontend
           - Standalone PyInstaller executable
@@ -168,6 +167,6 @@ jobs:
           2. Launch the application (double-click or terminal)
           3. No additional installation required !
         draft: false
-        prerelease: false
+        prerelease: ${{ github.ref == 'refs/heads/preview' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
